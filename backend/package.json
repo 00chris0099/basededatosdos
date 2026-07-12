@@ -1,0 +1,29 @@
+{
+  "name": "wms-backend",
+  "version": "1.0.0",
+  "description": "WMS Backend API - Express + TypeScript",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "msnodesqlv8": "^5.2.1",
+    "mssql": "^11.0.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/mssql": "^12.3.0",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}

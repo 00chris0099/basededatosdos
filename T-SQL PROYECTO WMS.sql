@@ -92,14 +92,11 @@ CREATE TABLE Categoria(
 
 CREATE TABLE Producto(
     Id_Producto INT IDENTITY(1,1) PRIMARY KEY,
-
+    Codigo_Producto VARCHAR(50) NOT NULL UNIQUE,
     Nombre_Producto VARCHAR(120) NOT NULL,
     Descripcion VARCHAR(300),
-
     Precio DECIMAL(10,2) NOT NULL,
-
     Stock_Minimo INT NOT NULL,
-
     Id_Categoria INT NOT NULL,
 
     CONSTRAINT CK_Producto_Precio
@@ -430,16 +427,16 @@ VALUES
 ('Entregado');
 
 INSERT INTO Producto
-(Nombre_Producto,Descripcion,Precio,Stock_Minimo,Id_Categoria)
+(Codigo_Producto,Nombre_Producto,Descripcion,Precio,Stock_Minimo,Id_Categoria)
 VALUES
-('Laptop Dell Inspiron','Laptop Core i7 16GB RAM',3500.00,10,1),
-('Monitor LG 24"','Monitor LED Full HD',750.00,8,1),
-('Teclado Logitech K120','Teclado USB',60.00,20,4),
-('Mouse Logitech M170','Mouse inalámbrico',55.00,20,4),
-('Impresora Epson L3250','Impresora multifuncional',950.00,5,2),
-('Taladro Bosch GSB13','Taladro percutor',420.00,6,3),
-('Martillo Stanley','Martillo de acero',45.00,15,3),
-('Escoba Industrial','Escoba de cerdas resistentes',35.00,10,5);
+('PROD001','Laptop Dell Inspiron','Laptop Core i7 16GB RAM',3500.00,10,1),
+('PROD002','Monitor LG 24"','Monitor LED Full HD',750.00,8,1),
+('PROD003','Teclado Logitech K120','Teclado USB',60.00,20,4),
+('PROD004','Mouse Logitech M170','Mouse inalámbrico',55.00,20,4),
+('PROD005','Impresora Epson L3250','Impresora multifuncional',950.00,5,2),
+('PROD006','Taladro Bosch GSB13','Taladro percutor',420.00,6,3),
+('PROD007','Martillo Stanley','Martillo de acero',45.00,15,3),
+('PROD008','Escoba Industrial','Escoba de cerdas resistentes',35.00,10,5);
 
 INSERT INTO Inventario
 (Stock_Actual,Estado_Stock,Id_Producto,Id_Ubicacion)
@@ -569,6 +566,7 @@ SELECT * FROM Cliente
 
 INSERT INTO Producto
 (
+    Codigo_Producto,
     Nombre_Producto,
     Descripcion,
     Precio,
@@ -577,6 +575,7 @@ INSERT INTO Producto
 )
 VALUES
 (
+    'PROD009',
     'Disco SSD Kingston 1TB',
     'Unidad de almacenamiento SSD',
     320.00,
@@ -1210,56 +1209,45 @@ EXEC sp_ProductosCategoria
 --5.8.4 Procedimiento 1: Registrar un producto utilizando TRY...CATCH y transacciones.
 
 CREATE PROCEDURE sp_InsertarProducto
-
-@Nombre VARCHAR(120),
-@Descripcion VARCHAR(300),
-@Precio DECIMAL(10,2),
-@StockMinimo INT,
-@IdCategoria INT
-
+    @Codigo VARCHAR(50),
+    @Nombre VARCHAR(120),
+    @Descripcion VARCHAR(300),
+    @Precio DECIMAL(10,2),
+    @StockMinimo INT,
+    @IdCategoria INT
 AS
-
 BEGIN
-
-BEGIN TRY
-
-BEGIN TRANSACTION
-
-INSERT INTO Producto
-(
-Nombre_Producto,
-Descripcion,
-Precio,
-Stock_Minimo,
-Id_Categoria
-)
-
-VALUES
-(
-@Nombre,
-@Descripcion,
-@Precio,
-@StockMinimo,
-@IdCategoria
-)
-
-COMMIT TRANSACTION
-
-PRINT 'Producto registrado correctamente.'
-
-END TRY
-
-BEGIN CATCH
-
-ROLLBACK TRANSACTION
-
-PRINT ERROR_MESSAGE()
-
-END CATCH
-
+    BEGIN TRY
+        BEGIN TRANSACTION
+            INSERT INTO Producto
+            (
+                Codigo_Producto,
+                Nombre_Producto,
+                Descripcion,
+                Precio,
+                Stock_Minimo,
+                Id_Categoria
+            )
+            VALUES
+            (
+                @Codigo,
+                @Nombre,
+                @Descripcion,
+                @Precio,
+                @StockMinimo,
+                @IdCategoria
+            )
+        COMMIT TRANSACTION
+        PRINT 'Producto registrado correctamente.'
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION
+        PRINT ERROR_MESSAGE()
+    END CATCH
 END;
 
 EXEC sp_InsertarProducto
+    @Codigo = 'PROD_ERR',
     @Nombre = 'Producto Error',
     @Descripcion = 'Prueba',
     @Precio = 100,
@@ -1415,6 +1403,7 @@ END;
 -------------------------------------------------
 INSERT INTO Producto
 (
+    Codigo_Producto,
     Nombre_Producto,
     Descripcion,
     Precio,
@@ -1423,6 +1412,7 @@ INSERT INTO Producto
 )
 VALUES
 (
+    'PROD010',
     'Disco SSD Kingston 1TB',
     'SSD NVMe',
     320.00,
@@ -1593,5 +1583,870 @@ FROM deleted
 END;
 -----------------------------------------------------------
 DELETE FROM Categoria
-
 WHERE Id_Categoria=1;
+
+-- ==============================================================================
+-- IMPLEMENTACIÓN DE REQUERIMIENTOS FUNCIONALES
+-- CODIGO ADICIONAL: PROCEDIMIENTOS ALMACENADOS, VISTAS Y TRIGGERS AVANZADOS
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- RF-01: REGISTRO DE PRODUCTOS CON CÓDIGO, NOMBRE, DESCRIPCIÓN, CATEGORÍA Y STOCK INICIAL
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE sp_RegistrarProductoWMS
+    @Codigo_Producto VARCHAR(50),
+    @Nombre_Producto VARCHAR(120),
+    @Descripcion VARCHAR(300),
+    @Precio DECIMAL(10,2),
+    @Stock_Minimo INT,
+    @Id_Categoria INT,
+    @Stock_Inicial INT,
+    @Id_Ubicacion VARCHAR(20),
+    @Id_Usuario INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF EXISTS (SELECT 1 FROM Producto WHERE Codigo_Producto = @Codigo_Producto)
+        BEGIN
+            THROW 51000, 'El código de producto ya existe.', 1;
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM Categoria WHERE Id_Categoria = @Id_Categoria)
+        BEGIN
+            THROW 51001, 'La categoría especificada no existe.', 1;
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM Ubicacion WHERE Codigo_Ubicacion = @Id_Ubicacion)
+        BEGIN
+            THROW 51002, 'La ubicación especificada no existe.', 1;
+        END
+
+        IF @Stock_Inicial < 0
+        BEGIN
+            THROW 51003, 'El stock inicial no puede ser negativo.', 1;
+        END
+
+        BEGIN TRANSACTION;
+
+        INSERT INTO Producto (Codigo_Producto, Nombre_Producto, Descripcion, Precio, Stock_Minimo, Id_Categoria)
+        VALUES (@Codigo_Producto, @Nombre_Producto, @Descripcion, @Precio, @Stock_Minimo, @Id_Categoria);
+
+        DECLARE @New_Id_Producto INT = SCOPE_IDENTITY();
+
+        INSERT INTO Inventario (Stock_Actual, Estado_Stock, Id_Producto, Id_Ubicacion)
+        VALUES (@Stock_Inicial, 'Disponible', @New_Id_Producto, @Id_Ubicacion);
+
+        DECLARE @New_Id_Inventario INT = SCOPE_IDENTITY();
+
+        -- Si hay stock inicial mayor a 0, se registra un movimiento de entrada
+        IF @Stock_Inicial > 0
+        BEGIN
+            INSERT INTO Movimiento_Inventario (Observacion, Id_Usuario, Id_Tipo_Movimiento)
+            VALUES ('Registro de Stock Inicial del producto ' + @Codigo_Producto, @Id_Usuario, 1); -- 1 = Entrada
+
+            DECLARE @New_Id_Movimiento INT = SCOPE_IDENTITY();
+
+            INSERT INTO Detalle_Movimiento (Cantidad, Id_Movimiento_Inventario, Id_Inventario)
+            VALUES (@Stock_Inicial, @New_Id_Movimiento, @New_Id_Inventario);
+        END
+
+        COMMIT TRANSACTION;
+        PRINT 'Producto y Stock Inicial registrados correctamente.';
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-02: REGISTRO DE CATEGORÍAS
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE sp_RegistrarCategoriaWMS
+    @Nombre_Categoria VARCHAR(80)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF EXISTS (SELECT 1 FROM Categoria WHERE Nombre_Categoria = @Nombre_Categoria)
+        BEGIN
+            THROW 51004, 'La categoría ya está registrada.', 1;
+        END
+
+        BEGIN TRANSACTION;
+        INSERT INTO Categoria (Nombre_Categoria)
+        VALUES (@Nombre_Categoria);
+        COMMIT TRANSACTION;
+        PRINT 'Categoría registrada correctamente.';
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-03: REGISTRO DE UBICACIONES FÍSICAS (PASILLOS, ESTANTES, NIVELES)
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE sp_RegistrarUbicacionWMS
+    @Pasillo VARCHAR(20),
+    @Estante VARCHAR(20),
+    @Nivel VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        DECLARE @Codigo_Ubicacion VARCHAR(20) = UPPER(@Pasillo) + @Estante + @Nivel;
+
+        IF EXISTS (SELECT 1 FROM Ubicacion WHERE Codigo_Ubicacion = @Codigo_Ubicacion)
+        BEGIN
+            THROW 51005, 'La ubicación ya existe en el almacén.', 1;
+        END
+
+        BEGIN TRANSACTION;
+        INSERT INTO Ubicacion (Codigo_Ubicacion, Pasillo, Estante, Nivel)
+        VALUES (@Codigo_Ubicacion, UPPER(@Pasillo), @Estante, @Nivel);
+        COMMIT TRANSACTION;
+        PRINT 'Ubicación registrada correctamente: ' + @Codigo_Ubicacion;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-04: REGISTRO DE ENTRADAS DE PRODUCTOS AL INVENTARIO
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE sp_RegistrarEntradaWMS
+    @Codigo_Producto VARCHAR(50),
+    @Cantidad INT,
+    @Codigo_Ubicacion VARCHAR(20),
+    @Id_Usuario INT,
+    @Observacion VARCHAR(300)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        DECLARE @Id_Producto INT;
+        SELECT @Id_Producto = Id_Producto FROM Producto WHERE Codigo_Producto = @Codigo_Producto;
+
+        IF @Id_Producto IS NULL
+        BEGIN
+            THROW 51006, 'El producto no existe.', 1;
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM Ubicacion WHERE Codigo_Ubicacion = @Codigo_Ubicacion)
+        BEGIN
+            THROW 51007, 'La ubicación no existe.', 1;
+        END
+
+        IF @Cantidad <= 0
+        BEGIN
+            THROW 51008, 'La cantidad de entrada debe ser mayor a cero.', 1;
+        END
+
+        BEGIN TRANSACTION;
+
+        DECLARE @Id_Inventario INT;
+        SELECT @Id_Inventario = Id_Inventario 
+        FROM Inventario 
+        WHERE Id_Producto = @Id_Producto AND Id_Ubicacion = @Codigo_Ubicacion;
+
+        IF @Id_Inventario IS NULL
+        BEGIN
+            INSERT INTO Inventario (Stock_Actual, Estado_Stock, Id_Producto, Id_Ubicacion)
+            VALUES (@Cantidad, 'Disponible', @Id_Producto, @Codigo_Ubicacion);
+            SET @Id_Inventario = SCOPE_IDENTITY();
+        END
+        ELSE
+        BEGIN
+            UPDATE Inventario 
+            SET Stock_Actual = Stock_Actual + @Cantidad 
+            WHERE Id_Inventario = @Id_Inventario;
+        END
+
+        -- Registrar Movimiento de Inventario
+        INSERT INTO Movimiento_Inventario (Observacion, Id_Usuario, Id_Tipo_Movimiento)
+        VALUES (COALESCE(@Observacion, 'Entrada de mercadería de producto ' + @Codigo_Producto), @Id_Usuario, 1); -- 1 = Entrada
+
+        DECLARE @Id_Movimiento INT = SCOPE_IDENTITY();
+
+        INSERT INTO Detalle_Movimiento (Cantidad, Id_Movimiento_Inventario, Id_Inventario)
+        VALUES (@Cantidad, @Id_Movimiento, @Id_Inventario);
+
+        COMMIT TRANSACTION;
+        PRINT 'Entrada registrada y stock actualizado.';
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-05: REGISTRO DE SALIDAS DE PRODUCTOS DEL INVENTARIO
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE sp_RegistrarSalidaWMS
+    @Codigo_Producto VARCHAR(50),
+    @Cantidad INT,
+    @Codigo_Ubicacion VARCHAR(20),
+    @Id_Usuario INT,
+    @Observacion VARCHAR(300)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        DECLARE @Id_Producto INT;
+        SELECT @Id_Producto = Id_Producto FROM Producto WHERE Codigo_Producto = @Codigo_Producto;
+
+        IF @Id_Producto IS NULL
+        BEGIN
+            THROW 51009, 'El producto no existe.', 1;
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM Ubicacion WHERE Codigo_Ubicacion = @Codigo_Ubicacion)
+        BEGIN
+            THROW 51010, 'La ubicación no existe.', 1;
+        END
+
+        IF @Cantidad <= 0
+        BEGIN
+            THROW 51011, 'La cantidad de salida debe ser mayor a cero.', 1;
+        END
+
+        BEGIN TRANSACTION;
+
+        DECLARE @Id_Inventario INT;
+        DECLARE @Stock_Actual INT;
+        SELECT @Id_Inventario = Id_Inventario, @Stock_Actual = Stock_Actual
+        FROM Inventario 
+        WHERE Id_Producto = @Id_Producto AND Id_Ubicacion = @Codigo_Ubicacion;
+
+        IF @Id_Inventario IS NULL OR @Stock_Actual < @Cantidad
+        BEGIN
+            THROW 51012, 'No hay stock suficiente en la ubicación indicada.', 1;
+        END
+
+        UPDATE Inventario 
+        SET Stock_Actual = Stock_Actual - @Cantidad 
+        WHERE Id_Inventario = @Id_Inventario;
+
+        -- Registrar Movimiento de Inventario
+        INSERT INTO Movimiento_Inventario (Observacion, Id_Usuario, Id_Tipo_Movimiento)
+        VALUES (COALESCE(@Observacion, 'Salida de mercadería de producto ' + @Codigo_Producto), @Id_Usuario, 2); -- 2 = Salida
+
+        DECLARE @Id_Movimiento INT = SCOPE_IDENTITY();
+
+        INSERT INTO Detalle_Movimiento (Cantidad, Id_Movimiento_Inventario, Id_Inventario)
+        VALUES (@Cantidad, @Id_Movimiento, @Id_Inventario);
+
+        COMMIT TRANSACTION;
+        PRINT 'Salida registrada y stock actualizado.';
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-06: REGISTRO DE DEVOLUCIONES DE PRODUCTOS Y ACTUALIZAR EL STOCK
+-- ------------------------------------------------------------------------------
+GO
+IF NOT EXISTS (SELECT 1 FROM Tipo_Movimiento WHERE Id_Tipo_Movimiento = 4)
+BEGIN
+    SET IDENTITY_INSERT Tipo_Movimiento ON;
+    INSERT INTO Tipo_Movimiento (Id_Tipo_Movimiento, Descripcion) VALUES (4, 'Devolución');
+    SET IDENTITY_INSERT Tipo_Movimiento OFF;
+END
+GO
+CREATE OR ALTER PROCEDURE sp_RegistrarDevolucionWMS
+    @Codigo_Producto VARCHAR(50),
+    @Cantidad INT,
+    @Codigo_Ubicacion VARCHAR(20),
+    @Id_Usuario INT,
+    @Observacion VARCHAR(300)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        DECLARE @Id_Producto INT;
+        SELECT @Id_Producto = Id_Producto FROM Producto WHERE Codigo_Producto = @Codigo_Producto;
+
+        IF @Id_Producto IS NULL
+        BEGIN
+            THROW 51013, 'El producto no existe.', 1;
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM Ubicacion WHERE Codigo_Ubicacion = @Codigo_Ubicacion)
+        BEGIN
+            THROW 51014, 'La ubicación no existe.', 1;
+        END
+
+        IF @Cantidad <= 0
+        BEGIN
+            THROW 51015, 'La cantidad de devolución debe ser mayor a cero.', 1;
+        END
+
+        BEGIN TRANSACTION;
+
+        DECLARE @Id_Inventario INT;
+        SELECT @Id_Inventario = Id_Inventario 
+        FROM Inventario 
+        WHERE Id_Producto = @Id_Producto AND Id_Ubicacion = @Codigo_Ubicacion;
+
+        IF @Id_Inventario IS NULL
+        BEGIN
+            INSERT INTO Inventario (Stock_Actual, Estado_Stock, Id_Producto, Id_Ubicacion)
+            VALUES (@Cantidad, 'Disponible', @Id_Producto, @Codigo_Ubicacion);
+            SET @Id_Inventario = SCOPE_IDENTITY();
+        END
+        ELSE
+        BEGIN
+            UPDATE Inventario 
+            SET Stock_Actual = Stock_Actual + @Cantidad 
+            WHERE Id_Inventario = @Id_Inventario;
+        END
+
+        -- Registrar Movimiento de Inventario
+        INSERT INTO Movimiento_Inventario (Observacion, Id_Usuario, Id_Tipo_Movimiento)
+        VALUES (COALESCE(@Observacion, 'Devolución de producto ' + @Codigo_Producto), @Id_Usuario, 4); -- 4 = Devolución
+
+        DECLARE @Id_Movimiento INT = SCOPE_IDENTITY();
+
+        INSERT INTO Detalle_Movimiento (Cantidad, Id_Movimiento_Inventario, Id_Inventario)
+        VALUES (@Cantidad, @Id_Movimiento, @Id_Inventario);
+
+        COMMIT TRANSACTION;
+        PRINT 'Devolución registrada e inventario actualizado.';
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-07: CONSULTA DISPONIBILIDAD DE STOCK EN TIEMPO REAL (VISTA)
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER VIEW vw_StockTiempoReal
+AS
+SELECT 
+    p.Codigo_Producto,
+    p.Nombre_Producto,
+    c.Nombre_Categoria,
+    i.Stock_Actual,
+    p.Stock_Minimo,
+    i.Estado_Stock,
+    i.Id_Ubicacion AS Codigo_Ubicacion,
+    u.Pasillo,
+    u.Estante,
+    u.Nivel
+FROM Inventario i
+INNER JOIN Producto p ON i.Id_Producto = p.Id_Producto
+INNER JOIN Categoria c ON p.Id_Categoria = c.Id_Categoria
+INNER JOIN Ubicacion u ON i.Id_Ubicacion = u.Codigo_Ubicacion;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-08: CONSULTA DEL HISTORIAL DE MOVIMIENTOS DE INVENTARIO (VISTA)
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER VIEW vw_HistorialMovimientos
+AS
+SELECT 
+    mi.Id_Movimiento_Inventario,
+    mi.Fecha_Movimiento,
+    tm.Descripcion AS Tipo_Movimiento,
+    p.Codigo_Producto,
+    p.Nombre_Producto,
+    dm.Cantidad,
+    i.Id_Ubicacion AS Codigo_Ubicacion,
+    u.Nombre AS Usuario_Responsable,
+    mi.Observacion
+FROM Detalle_Movimiento dm
+INNER JOIN Movimiento_Inventario mi ON dm.Id_Movimiento_Inventario = mi.Id_Movimiento_Inventario
+INNER JOIN Tipo_Movimiento tm ON mi.Id_Tipo_Movimiento = tm.Id_Tipo_Movimiento
+INNER JOIN Inventario i ON dm.Id_Inventario = i.Id_Inventario
+INNER JOIN Producto p ON i.Id_Producto = p.Id_Producto
+INNER JOIN Usuario u ON mi.Id_Usuario = u.Id_Usuario;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-09: CONSULTA DEL ESTADO ACTUAL DE LOS PEDIDOS (VISTA)
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER VIEW vw_EstadoActualPedidos
+AS
+SELECT 
+    p.Id_Pedido,
+    p.Fecha_Pedido,
+    c.Nombre AS Cliente,
+    c.Num_Documento AS Documento_Cliente,
+    ep.Descripcion AS Estado_Pedido,
+    p.Precio_Total,
+    (SELECT COUNT(*) FROM Detalle_Pedido dp WHERE dp.Id_Pedido = p.Id_Pedido) AS Total_Lineas,
+    (SELECT SUM(dp.Cantidad) FROM Detalle_Pedido dp WHERE dp.Id_Pedido = p.Id_Pedido) AS Total_Unidades
+FROM Pedido p
+INNER JOIN Cliente c ON p.Id_Cliente = c.Id_Cliente
+INNER JOIN Estado_Pedido ep ON p.Id_Estado_Pedido = ep.Id_Estado_Pedido;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-10: REPORTE DE PRODUCTOS CON BAJO STOCK
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE sp_ReporteProductosBajoStock
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT 
+        p.Codigo_Producto,
+        p.Nombre_Producto,
+        c.Nombre_Categoria,
+        p.Stock_Minimo,
+        COALESCE(SUM(i.Stock_Actual), 0) AS Stock_Total_Actual,
+        CASE 
+            WHEN COALESCE(SUM(i.Stock_Actual), 0) = 0 THEN 'Sin Stock'
+            WHEN COALESCE(SUM(i.Stock_Actual), 0) <= p.Stock_Minimo THEN 'Alerta: Bajo Stock'
+            ELSE 'Disponible'
+        END AS Estado_Alerta
+    FROM Producto p
+    INNER JOIN Categoria c ON p.Id_Categoria = c.Id_Categoria
+    LEFT JOIN Inventario i ON p.Id_Producto = i.Id_Producto
+    GROUP BY p.Codigo_Producto, p.Nombre_Producto, c.Nombre_Categoria, p.Stock_Minimo
+    HAVING COALESCE(SUM(i.Stock_Actual), 0) <= p.Stock_Minimo
+    ORDER BY Stock_Total_Actual ASC;
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-11: REPORTE DE ENTRADAS, SALIDAS Y DEVOLUCIONES DE PRODUCTOS
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE sp_ReporteMovimientosPorRango
+    @FechaInicio DATETIME2,
+    @FechaFin DATETIME2,
+    @Id_Tipo_Movimiento INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT 
+        mi.Id_Movimiento_Inventario,
+        mi.Fecha_Movimiento,
+        tm.Descripcion AS Tipo_Movimiento,
+        p.Codigo_Producto,
+        p.Nombre_Producto,
+        dm.Cantidad,
+        i.Id_Ubicacion AS Codigo_Ubicacion,
+        u.Nombre AS Usuario,
+        mi.Observacion
+    FROM Detalle_Movimiento dm
+    INNER JOIN Movimiento_Inventario mi ON dm.Id_Movimiento_Inventario = mi.Id_Movimiento_Inventario
+    INNER JOIN Tipo_Movimiento tm ON mi.Id_Tipo_Movimiento = tm.Id_Tipo_Movimiento
+    INNER JOIN Inventario i ON dm.Id_Inventario = i.Id_Inventario
+    INNER JOIN Producto p ON i.Id_Producto = p.Id_Producto
+    INNER JOIN Usuario u ON mi.Id_Usuario = u.Id_Usuario
+    WHERE mi.Fecha_Movimiento BETWEEN @FechaInicio AND @FechaFin
+      AND (@Id_Tipo_Movimiento IS NULL OR mi.Id_Tipo_Movimiento = @Id_Tipo_Movimiento)
+    ORDER BY mi.Fecha_Movimiento DESC;
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-12: REPORTE DE PEDIDOS PROCESADOS Y PENDIENTES
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE sp_ReportePedidosPorEstado
+    @Id_Estado_Pedido INT = NULL -- NULL para listar todos
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT 
+        p.Id_Pedido,
+        p.Fecha_Pedido,
+        c.Nombre AS Cliente,
+        ep.Descripcion AS Estado_Pedido,
+        p.Precio_Total,
+        COUNT(dp.Id_Detalle_Pedido) AS Cantidad_Items,
+        SUM(dp.Cantidad) AS Total_Articulos
+    FROM Pedido p
+    INNER JOIN Cliente c ON p.Id_Cliente = c.Id_Cliente
+    INNER JOIN Estado_Pedido ep ON p.Id_Estado_Pedido = ep.Id_Estado_Pedido
+    LEFT JOIN Detalle_Pedido dp ON p.Id_Pedido = dp.Id_Pedido
+    WHERE (@Id_Estado_Pedido IS NULL OR p.Id_Estado_Pedido = @Id_Estado_Pedido)
+    GROUP BY p.Id_Pedido, p.Fecha_Pedido, c.Nombre, ep.Descripcion, p.Precio_Total
+    ORDER BY p.Fecha_Pedido DESC;
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-13: VALIDAR LA DISPONIBILIDAD DE STOCK ANTES DE CONFIRMAR UN PEDIDO
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE sp_RegistrarDetallePedidoValidado
+    @Id_Pedido INT,
+    @Codigo_Producto VARCHAR(50),
+    @Cantidad INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        DECLARE @Id_Producto INT;
+        DECLARE @Precio_Unitario DECIMAL(10,2);
+        SELECT @Id_Producto = Id_Producto, @Precio_Unitario = Precio 
+        FROM Producto 
+        WHERE Codigo_Producto = @Codigo_Producto;
+
+        IF @Id_Producto IS NULL
+        BEGIN
+            THROW 51016, 'El producto especificado no existe.', 1;
+        END
+
+        IF @Cantidad <= 0
+        BEGIN
+            THROW 51017, 'La cantidad solicitada debe ser mayor a cero.', 1;
+        END
+
+        -- Validar el stock actual total disponible en inventario
+        DECLARE @Stock_Disponible INT;
+        SELECT @Stock_Disponible = COALESCE(SUM(Stock_Actual), 0)
+        FROM Inventario
+        WHERE Id_Producto = @Id_Producto;
+
+        IF @Stock_Disponible < @Cantidad
+        BEGIN
+            THROW 51018, 'Stock insuficiente para confirmar este producto en el pedido.', 1;
+        END
+
+        BEGIN TRANSACTION;
+
+        DECLARE @Subtotal DECIMAL(10,2) = @Cantidad * @Precio_Unitario;
+
+        -- Insertar el detalle
+        INSERT INTO Detalle_Pedido (Cantidad, Subtotal, Precio_Unitario, Id_Pedido, Id_Producto)
+        VALUES (@Cantidad, @Subtotal, @Precio_Unitario, @Id_Pedido, @Id_Producto);
+
+        -- Actualizar el total del pedido
+        UPDATE Pedido
+        SET Precio_Total = Precio_Total + @Subtotal
+        WHERE Id_Pedido = @Id_Pedido;
+
+        COMMIT TRANSACTION;
+        PRINT 'Item registrado y stock validado correctamente.';
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-14: IMPEDIR REGISTRAR CANTIDADES NEGATIVAS EN EL INVENTARIO
+-- ------------------------------------------------------------------------------
+-- Nota: La restricción ya existe a nivel físico en la definición de la tabla:
+-- ALTER TABLE Inventario ADD CONSTRAINT CK_Inventario_Stock CHECK(Stock_Actual >= 0);
+-- Sin embargo, implementaremos un trigger para reforzar a nivel transaccional:
+GO
+CREATE OR ALTER TRIGGER TR_ImpedirStockNegativo
+ON Inventario
+AFTER UPDATE, INSERT
+AS
+BEGIN
+    IF EXISTS (SELECT 1 FROM inserted WHERE Stock_Actual < 0)
+    BEGIN
+        RAISERROR ('No se permiten stocks negativos en el inventario.', 16, 1);
+        ROLLBACK TRANSACTION;
+        RETURN;
+    END
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-15: VALIDAR QUE CADA PRODUCTO ESTÉ ASIGNADO A UNA UBICACIÓN DEL ALMACÉN
+-- ------------------------------------------------------------------------------
+-- Nota: La restricción se da a nivel físico debido a que Id_Ubicacion es VARCHAR(20) NOT NULL en Inventario
+-- y tiene una FK hacia Ubicacion(Codigo_Ubicacion). 
+-- Para agregar lógica adicional, creamos un trigger que valida asignaciones en Inventario.
+GO
+CREATE OR ALTER TRIGGER TR_ValidarAsignacionUbicacion
+ON Inventario
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    IF EXISTS (
+        SELECT 1 
+        FROM inserted i
+        LEFT JOIN Ubicacion u ON i.Id_Ubicacion = u.Codigo_Ubicacion
+        WHERE u.Codigo_Ubicacion IS NULL
+    )
+    BEGIN
+        RAISERROR ('El producto debe ser asignado a una ubicación física válida dentro del almacén.', 16, 1);
+        ROLLBACK TRANSACTION;
+        RETURN;
+    END
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-16: MANTENIMIENTO DE DATOS (ACTUALIZACIONES)
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE sp_ActualizarProductoWMS
+    @Id_Producto INT,
+    @Nombre_Producto VARCHAR(120),
+    @Descripcion VARCHAR(300),
+    @Precio DECIMAL(10,2),
+    @Stock_Minimo INT,
+    @Id_Categoria INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM Producto WHERE Id_Producto = @Id_Producto)
+        BEGIN
+            THROW 51019, 'El producto a actualizar no existe.', 1;
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM Categoria WHERE Id_Categoria = @Id_Categoria)
+        BEGIN
+            THROW 51020, 'La categoría especificada no existe.', 1;
+        END
+
+        BEGIN TRANSACTION;
+        UPDATE Producto
+        SET Nombre_Producto = @Nombre_Producto,
+            Descripcion = @Descripcion,
+            Precio = @Precio,
+            Stock_Minimo = @Stock_Minimo,
+            Id_Categoria = @Id_Categoria
+        WHERE Id_Producto = @Id_Producto;
+        COMMIT TRANSACTION;
+        PRINT 'Producto actualizado correctamente.';
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+CREATE OR ALTER PROCEDURE sp_ActualizarCategoriaWMS
+    @Id_Categoria INT,
+    @Nombre_Categoria VARCHAR(80)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM Categoria WHERE Id_Categoria = @Id_Categoria)
+        BEGIN
+            THROW 51021, 'La categoría a actualizar no existe.', 1;
+        END
+
+        BEGIN TRANSACTION;
+        UPDATE Categoria
+        SET Nombre_Categoria = @Nombre_Categoria
+        WHERE Id_Categoria = @Id_Categoria;
+        COMMIT TRANSACTION;
+        PRINT 'Categoría actualizada correctamente.';
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+CREATE OR ALTER PROCEDURE sp_ActualizarUbicacionWMS
+    @Codigo_Ubicacion VARCHAR(20),
+    @Pasillo VARCHAR(20),
+    @Estante VARCHAR(20),
+    @Nivel VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM Ubicacion WHERE Codigo_Ubicacion = @Codigo_Ubicacion)
+        BEGIN
+            THROW 51022, 'La ubicación a actualizar no existe.', 1;
+        END
+
+        BEGIN TRANSACTION;
+        -- Si cambia el pasillo, estante o nivel, cambiamos el código primario de ubicación
+        -- Nota: debido a llaves foráneas, esto requiere ON UPDATE CASCADE o manejo manual.
+        -- Como la tabla tiene FK en Inventario, actualizaremos los campos físicos.
+        UPDATE Ubicacion
+        SET Pasillo = UPPER(@Pasillo),
+            Estante = @Estante,
+            Nivel = @Nivel
+        WHERE Codigo_Ubicacion = @Codigo_Ubicacion;
+        COMMIT TRANSACTION;
+        PRINT 'Información física de ubicación actualizada.';
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-17: ELIMINAR REGISTROS OBSOLETOS O INCORRECTOS (BORRADO SEGURO)
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE sp_EliminarProductoWMS
+    @Id_Producto INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM Producto WHERE Id_Producto = @Id_Producto)
+        BEGIN
+            THROW 51023, 'El producto no existe.', 1;
+        END
+
+        -- Validar si tiene stock asociado o movimientos
+        IF EXISTS (SELECT 1 FROM Inventario WHERE Id_Producto = @Id_Producto AND Stock_Actual > 0)
+        BEGIN
+            THROW 51024, 'No se puede eliminar el producto porque tiene existencias en stock.', 1;
+        END
+
+        BEGIN TRANSACTION;
+        -- Eliminar dependencias inactivas en inventario con stock 0
+        DELETE FROM Inventario WHERE Id_Producto = @Id_Producto;
+        -- Eliminar el producto
+        DELETE FROM Producto WHERE Id_Producto = @Id_Producto;
+        COMMIT TRANSACTION;
+        PRINT 'Producto eliminado correctamente.';
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+CREATE OR ALTER PROCEDURE sp_EliminarCategoriaWMS
+    @Id_Categoria INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM Categoria WHERE Id_Categoria = @Id_Categoria)
+        BEGIN
+            THROW 51025, 'La categoría no existe.', 1;
+        END
+
+        IF EXISTS (SELECT 1 FROM Producto WHERE Id_Categoria = @Id_Categoria)
+        BEGIN
+            THROW 51026, 'No se puede eliminar la categoría porque tiene productos asociados.', 1;
+        END
+
+        BEGIN TRANSACTION;
+        DELETE FROM Categoria WHERE Id_Categoria = @Id_Categoria;
+        COMMIT TRANSACTION;
+        PRINT 'Categoría eliminada correctamente.';
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-18: AUTENTICACIÓN DE USUARIOS MEDIANTE USUARIO Y CONTRASEÑA
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE sp_AutenticarUsuarioWMS
+    @Correo VARCHAR(100),
+    @Contrasena VARCHAR(255)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Para esta implementación académica y demo:
+    -- Buscamos el usuario por su correo y verificamos si coincide su contraseña en texto plano o hash.
+    SELECT 
+        u.Id_Usuario,
+        u.Nombre,
+        u.Correo,
+        r.Nombre_Rol AS Rol
+    FROM Usuario u
+    INNER JOIN Rol r ON u.Id_Rol = r.Id_Rol
+    WHERE u.Correo = @Correo 
+      AND u.Contrasena = @Contrasena;
+      
+    IF @@ROWCOUNT = 0
+    BEGIN
+        PRINT 'Credenciales de acceso incorrectas.';
+    END
+    ELSE
+    BEGIN
+        PRINT 'Autenticación exitosa.';
+    END
+END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- RF-19: GESTIONAR ROLES DE ACCESO (ADMINISTRADOR, SUPERVISOR, OPERARIO)
+-- ------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE sp_AsignarRolUsuarioWMS
+    @Id_Usuario INT,
+    @Id_Rol INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM Usuario WHERE Id_Usuario = @Id_Usuario)
+        BEGIN
+            THROW 51027, 'El usuario no existe.', 1;
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM Rol WHERE Id_Rol = @Id_Rol)
+        BEGIN
+            THROW 51028, 'El rol especificado no existe.', 1;
+        END
+
+        BEGIN TRANSACTION;
+        UPDATE Usuario
+        SET Id_Rol = @Id_Rol
+        WHERE Id_Usuario = @Id_Usuario;
+        COMMIT TRANSACTION;
+        PRINT 'Rol de usuario actualizado correctamente.';
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
