@@ -169,9 +169,7 @@ export default function Shell({ children }: { children: ReactNode }) {
               flexShrink: 0, overflow: "hidden",
             }}
           >
-            {user?.photo
-              ? <img src={user.photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : (user?.name?.charAt(0) || "?")}
+            {(user?.name?.charAt(0) || "?")}
           </div>
           {!collapsed && (
             <div style={{ flex: 1, minWidth: 0 }}>

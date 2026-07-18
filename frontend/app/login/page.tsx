@@ -204,7 +204,7 @@ function LoginForm() {
             background: "#f8fafc", border: "1px solid #e2e8f0",
             borderRadius: 10, fontSize: 12, color: "#64748b",
           }}>
-            <strong style={{ color: "#334155" }}>Demo:</strong> admin@wms.com / admin123
+            <strong style={{ color: "#334155" }}>Demo:</strong> juan.perez@almacen.com / Admin2025#
           </div>
 
           <p style={{ textAlign: "center", fontSize: 12, color: "#94a3b8", marginTop: 24 }}>

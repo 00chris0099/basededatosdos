@@ -169,11 +169,7 @@ export default function UsersPage() {
               fontSize: 32, fontWeight: 700, color: "#2563eb",
               overflow: "hidden", boxShadow: "0 4px 10px rgba(0,0,0,0.05)"
             }}>
-              {user?.photo ? (
-                <img src={user.photo} alt={user.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                user?.name?.charAt(0) || "?"
-              )}
+              {user?.name?.charAt(0) || "?"}
             </div>
             <span style={{ position: "absolute", bottom: 4, right: 4, width: 16, height: 16, background: "#10b981", border: "3px solid #fff", borderRadius: "50%" }} />
           </div>
@@ -187,7 +183,7 @@ export default function UsersPage() {
 
           <div style={{ fontSize: 13.5, color: "#64748b", display: "flex", flexDirection: "column", gap: 2 }}>
             <span>{user?.email}</span>
-            {user?.dni && <span style={{ fontSize: 11, color: "#94a3b8" }}>DNI: {user.dni}</span>}
+            <span style={{ fontSize: 11, color: "#94a3b8" }}>{user?.role}</span>
           </div>
         </div>
       </div>
