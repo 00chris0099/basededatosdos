@@ -202,6 +202,15 @@ select {
   overflow-x: hidden;
 }
 
+@media (max-width: 768px) {
+  .app-content {
+    padding: 16px;
+  }
+  .app-topbar {
+    padding: 0 16px;
+  }
+}
+
 /* ──────────────────────────────────────────────
    PREMIUM CARD
 ────────────────────────────────────────────── */
@@ -389,4 +398,77 @@ select {
   padding: 13px 16px;
   font-size: 13.5px;
   color: #334155;
+}
+
+@media (max-width: 768px) {
+  .data-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .data-table thead th {
+    padding: 10px 12px;
+    font-size: 10px;
+  }
+  .data-table tbody td {
+    padding: 10px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+}
+
+/* ──────────────────────────────────────────────
+   RESPONSIVE GRID UTILITIES
+────────────────────────────────────────────── */
+.grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 20px;
+  align-items: start;
+}
+
+.grid-2even {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.grid-hero {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .grid-2col,
+  .grid-2even,
+  .grid-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+.grid-4even {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .grid-4even {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.grid-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+@media (max-width: 600px) {
+  .grid-form {
+    grid-template-columns: 1fr;
+  }
 }

@@ -116,6 +116,7 @@ CREATE TABLE Producto(
     Stock_Minimo INT NOT NULL,
     Id_Categoria INT NOT NULL,
     Id_Marca INT NULL,
+    Imagen VARCHAR(MAX) NULL,
     CONSTRAINT CK_Producto_Precio CHECK(Precio > 0),
     CONSTRAINT CK_Producto_StockMinimo CHECK(Stock_Minimo >= 0),
     CONSTRAINT FK_Producto_Categoria FOREIGN KEY(Id_Categoria) REFERENCES Categoria(Id_Categoria),
@@ -571,7 +572,8 @@ CREATE OR ALTER PROCEDURE sp_RegistrarProductoWMS
     @Stock_Inicial INT,
     @Id_Ubicacion VARCHAR(20),
     @Id_Usuario INT,
-    @Id_Marca INT = NULL
+    @Id_Marca INT = NULL,
+    @Imagen VARCHAR(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -593,8 +595,8 @@ BEGIN
 
         BEGIN TRANSACTION;
 
-        INSERT INTO Producto (Codigo_Producto, Nombre_Producto, Descripcion, Precio, Stock_Minimo, Id_Categoria, Id_Marca)
-        VALUES (@Codigo_Producto, @Nombre_Producto, @Descripcion, @Precio, @Stock_Minimo, @Id_Categoria, @Id_Marca);
+        INSERT INTO Producto (Codigo_Producto, Nombre_Producto, Descripcion, Precio, Stock_Minimo, Id_Categoria, Id_Marca, Imagen)
+        VALUES (@Codigo_Producto, @Nombre_Producto, @Descripcion, @Precio, @Stock_Minimo, @Id_Categoria, @Id_Marca, @Imagen);
 
         DECLARE @New_Id_Producto INT = SCOPE_IDENTITY();
 
@@ -958,7 +960,9 @@ CREATE OR ALTER PROCEDURE sp_ActualizarProductoWMS
     @Descripcion VARCHAR(300),
     @Precio DECIMAL(10,2),
     @Stock_Minimo INT,
-    @Id_Categoria INT
+    @Id_Categoria INT,
+    @Id_Marca INT = NULL,
+    @Imagen VARCHAR(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -972,7 +976,8 @@ BEGIN
         BEGIN TRANSACTION;
         UPDATE Producto
         SET Nombre_Producto = @Nombre_Producto, Descripcion = @Descripcion,
-            Precio = @Precio, Stock_Minimo = @Stock_Minimo, Id_Categoria = @Id_Categoria
+            Precio = @Precio, Stock_Minimo = @Stock_Minimo, Id_Categoria = @Id_Categoria,
+            Id_Marca = @Id_Marca, Imagen = @Imagen
         WHERE Id_Producto = @Id_Producto;
         COMMIT TRANSACTION;
     END TRY

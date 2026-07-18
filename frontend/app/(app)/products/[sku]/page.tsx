@@ -114,24 +114,37 @@ export default function ProductDetailPage({ params }: { params: Promise<{ sku: s
             ← Volver
           </Link>
           {canSupervise() && (
-            <button onClick={() => setShowMovementModal(true)} className="premium-button">
-              <span className="material-symbols-outlined" style={{ fontSize: 17 }}>swap_horiz</span>
-              Registrar Movimiento
-            </button>
+            <>
+              <Link href={`/products/${sku}/edit`} className="premium-button" style={{ textDecoration: "none" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 17 }}>edit</span>
+                Editar
+              </Link>
+              <button onClick={() => setShowMovementModal(true)} className="premium-button">
+                <span className="material-symbols-outlined" style={{ fontSize: 17 }}>swap_horiz</span>
+                Movimiento
+              </button>
+            </>
           )}
         </div>
       </div>
 
       {/* PRODUCT HERO */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 20, alignItems: "start" }}>
+      <div className="grid-hero">
         <div className="premium-card" style={{ padding: 28, display: "flex", gap: 24, alignItems: "flex-start" }}>
-          <div style={{
-            width: 140, height: 120, borderRadius: 12,
-            background: "#f1f5f9", border: "1px solid #e2e8f0",
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 40, color: "#94a3b8" }}>inventory_2</span>
-          </div>
+          {product.Imagen ? (
+            <img src={product.Imagen} alt={product.Nombre_Producto} style={{
+              width: 140, height: 120, objectFit: "cover",
+              borderRadius: 12, border: "1px solid #e2e8f0", flexShrink: 0,
+            }} />
+          ) : (
+            <div style={{
+              width: 140, height: 120, borderRadius: 12,
+              background: "#f1f5f9", border: "1px solid #e2e8f0",
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 40, color: "#94a3b8" }}>inventory_2</span>
+            </div>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ marginBottom: 10 }}>
               <StatusBadge status={status} />
@@ -177,7 +190,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ sku: s
       </div>
 
       {/* DESCRIPTION + LOCATION */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div className="grid-2even">
         <div className="premium-card" style={{ padding: 24 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", fontFamily: "var(--font-display, system-ui)", margin: "0 0 12px 0", paddingBottom: 10, borderBottom: "1px solid #e2e8f0" }}>
             Descripción del Producto
@@ -191,7 +204,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ sku: s
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", fontFamily: "var(--font-display, system-ui)", margin: "0 0 16px 0", paddingBottom: 10, borderBottom: "1px solid #e2e8f0" }}>
             Ubicación en Almacén
           </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, textAlign: "center", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
+          <div className="grid-4even" style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
             {["Sección", "Pasillo", "Nivel", "Bin"].map((label, i) => (
               <div key={label}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>

@@ -47,7 +47,7 @@ export const getById = async (req: Request, res: Response) => {
 
 export const create = async (req: Request, res: Response) => {
   try {
-    const { codigo, nombre, descripcion, precio, stockMinimo, categoria, stockInicial, ubicacion, idMarca } = req.body;
+    const { codigo, nombre, descripcion, precio, stockMinimo, categoria, stockInicial, ubicacion, idMarca, imagen } = req.body;
     const userId = (req as RequestWithUser).user?.userId || 1;
 
     await pool.request()
@@ -61,6 +61,7 @@ export const create = async (req: Request, res: Response) => {
       .input('Id_Ubicacion', sql.VarChar, ubicacion || 'A101')
       .input('Id_Usuario', sql.Int, userId)
       .input('Id_Marca', sql.Int, idMarca || null)
+      .input('Imagen', sql.VarChar(sql.MAX), imagen || null)
       .execute('sp_RegistrarProductoWMS');
 
     return res.status(201).json({ success: true, message: 'Producto creado exitosamente' });
@@ -74,7 +75,7 @@ export const create = async (req: Request, res: Response) => {
 export const update = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { nombre, descripcion, precio, stockMinimo, categoria } = req.body;
+    const { nombre, descripcion, precio, stockMinimo, categoria, idMarca, imagen } = req.body;
 
     await pool.request()
       .input('Id_Producto', sql.Int, parseInt(id))
@@ -83,6 +84,8 @@ export const update = async (req: Request, res: Response) => {
       .input('Precio', sql.Decimal(10, 2), precio)
       .input('Stock_Minimo', sql.Int, stockMinimo || 0)
       .input('Id_Categoria', sql.Int, categoria)
+      .input('Id_Marca', sql.Int, idMarca || null)
+      .input('Imagen', sql.VarChar(sql.MAX), imagen || null)
       .execute('sp_ActualizarProductoWMS');
 
     return res.status(200).json({ success: true, message: 'Producto actualizado exitosamente' });

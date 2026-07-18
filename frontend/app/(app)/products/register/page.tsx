@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
 import { apiClient, getCategories, getBrandsByCategory, createCategory, createBrand, Category, Brand } from "@/lib/api/client";
 import ModalOverlay from "@/components/ModalOverlay";
+import ImageUploader from "@/components/ImageUploader";
 
 const fieldStyle: React.CSSProperties = {
   width: "100%",
@@ -86,6 +87,7 @@ export default function ProductRegisterPage() {
     stock: "0",
     min: "0",
     max: "100",
+    imagen: null as string | null,
     section: "A",
     aisle: "1",
     level: "01",
@@ -155,6 +157,7 @@ export default function ProductRegisterPage() {
         idMarca: form.brandId ? Number(form.brandId) : null,
         stockInicial: Number(form.stock),
         ubicacion: locationCode,
+        imagen: form.imagen,
       },
     });
     router.push("/products");
@@ -209,10 +212,7 @@ export default function ProductRegisterPage() {
       </div>
 
       {/* FORM GRID */}
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 20, alignItems: "start" }}
-      >
+      <form onSubmit={handleSubmit} className="grid-2col">
         {/* LEFT: General Info */}
         <div className="premium-card" style={{ padding: 28 }}>
           <h3 style={{
@@ -224,7 +224,7 @@ export default function ProductRegisterPage() {
             Información General
           </h3>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 18 }}>
+          <div className="grid-form" style={{ marginBottom: 18 }}>
             <div>
               <label style={labelStyle}>Nombre del producto *</label>
               <input
@@ -328,6 +328,18 @@ export default function ProductRegisterPage() {
 
         {/* RIGHT: Inventory + Location */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div className="premium-card" style={{ padding: 24 }}>
+            <h3 style={{
+              fontSize: 14, fontWeight: 700, color: "#0f172a",
+              fontFamily: "var(--font-display, system-ui)",
+              margin: "0 0 18px 0", paddingBottom: 12,
+              borderBottom: "1px solid #e2e8f0",
+            }}>
+              Imagen del Producto
+            </h3>
+            <ImageUploader value={form.imagen} onChange={(img) => setForm({ ...form, imagen: img })} size={180} />
+          </div>
+
           <div className="premium-card" style={{ padding: 24 }}>
             <h3 style={{
               fontSize: 14, fontWeight: 700, color: "#0f172a",
