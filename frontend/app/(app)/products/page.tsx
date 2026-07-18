@@ -63,23 +63,28 @@ export default function ProductsPage() {
           </thead>
           <tbody>
             {filtered.map((p: any) => {
-              const status = p.Stock_Actual === 0 ? "Agotado" : p.Stock_Actual <= p.Stock_Minimo ? "Bajo Stock" : "En Stock";
+              const stock = Number(p.Stock_Actual) || 0;
+              const min = Number(p.Stock_Minimo) || 0;
+              const precio = Number(p.Precio) || 0;
+              const status = stock === 0 ? "Agotado" : stock <= min ? "Bajo Stock" : "En Stock";
               const statusColor = status === "En Stock" ? "#15803d" : status === "Bajo Stock" ? "#d97706" : "#dc2626";
               const statusBg = status === "En Stock" ? "#dcfce7" : status === "Bajo Stock" ? "#fffbeb" : "#fef2f2";
               return (
-                <tr key={p.Codigo_Producto}>
-                  <td style={{ fontWeight: 700, color: "#2563eb" }}>{p.Codigo_Producto}</td>
-                  <td style={{ fontWeight: 600 }}>{p.Nombre_Producto}</td>
-                  <td>{p.Nombre_Categoria}</td>
-                  <td style={{ fontWeight: 700 }}>S/ {Number(p.Precio).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</td>
-                  <td style={{ fontWeight: 700 }}>{p.Stock_Actual}</td>
-                  <td style={{ color: "#64748b" }}>{p.Codigo_Ubicacion}</td>
-                  <td>
-                    <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: statusBg, color: statusColor }}>
-                      {status}
-                    </span>
-                  </td>
-                </tr>
+                <Link key={p.Codigo_Producto} href={`/products/${p.Codigo_Producto}`} style={{ textDecoration: "none", color: "inherit" }}>
+                  <tr style={{ cursor: "pointer" }}>
+                    <td style={{ fontWeight: 700, color: "#2563eb" }}>{p.Codigo_Producto}</td>
+                    <td style={{ fontWeight: 600 }}>{p.Nombre_Producto}</td>
+                    <td>{p.Nombre_Categoria}</td>
+                    <td style={{ fontWeight: 700 }}>S/ {precio.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</td>
+                    <td style={{ fontWeight: 700 }}>{stock}</td>
+                    <td style={{ color: "#64748b" }}>{p.Codigo_Ubicacion}</td>
+                    <td>
+                      <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: statusBg, color: statusColor }}>
+                        {status}
+                      </span>
+                    </td>
+                  </tr>
+                </Link>
               );
             })}
           </tbody>

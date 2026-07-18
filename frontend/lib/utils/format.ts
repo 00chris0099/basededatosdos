@@ -13,13 +13,15 @@ export function esc(s: unknown): string {
 export function statusBadgeColor(s: string): string {
   const map: Record<string, string> = {
     Pendiente: "badge-pendiente",
+    "En Proceso": "badge-picking",
+    Completado: "badge-en-ruta",
+    Cancelado: "badge-cancelado",
     Picking: "badge-picking",
     Packing: "badge-packing",
     "Listo para Despacho": "badge-pendiente",
     "En Ruta": "badge-picking",
     Entregado: "badge-en-ruta",
     Despachado: "badge-en-ruta",
-    Cancelado: "badge-cancelado",
     "En Stock": "badge-en-ruta",
     "Bajo Stock": "badge-packing",
     Agotado: "badge-cancelado",
@@ -34,7 +36,7 @@ export function statusBadgeColor(s: string): string {
 }
 
 export function orderFlow(): string[] {
-  return ["Pendiente", "Picking", "Packing", "Listo para Despacho", "En Ruta", "Entregado", "Cancelado"];
+  return ["Pendiente", "En Proceso", "Completado", "Cancelado"];
 }
 
 export function nextOrderStatus(status: string): string {
