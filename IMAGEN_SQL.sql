@@ -6,8 +6,9 @@
 USE BD_WMS_ECOMMERCE;
 GO
 
--- 1. Agregar columna Imagen (VARCHAR(MAX) para Base64)
-ALTER TABLE Producto ADD Imagen VARCHAR(MAX) NULL;
+-- 1. Agregar columna Imagen (VARCHAR(MAX) para Base64) si no existe
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Producto') AND name = 'Imagen')
+    ALTER TABLE Producto ADD Imagen VARCHAR(MAX) NULL;
 GO
 
 -- 2. Actualizar sp_RegistrarProductoWMS para aceptar Imagen
