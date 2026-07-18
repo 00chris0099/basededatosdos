@@ -25,7 +25,13 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const user = result.recordset[0];
-    const validPassword = await bcrypt.compare(password, user.Contrasena);
+
+    let validPassword = false;
+    if (user.Contrasena.startsWith('$2a$') || user.Contrasena.startsWith('$2b$')) {
+      validPassword = await bcrypt.compare(password, user.Contrasena);
+    } else {
+      validPassword = password === user.Contrasena;
+    }
 
     if (!validPassword) {
       return res.status(400).json({ success: false, message: 'Credenciales inválidas' });
