@@ -47,7 +47,7 @@ export const getById = async (req: Request, res: Response) => {
 
 export const create = async (req: Request, res: Response) => {
   try {
-    const { codigo, nombre, descripcion, precio, stockMinimo, categoria, stockInicial, ubicacion } = req.body;
+    const { codigo, nombre, descripcion, precio, stockMinimo, categoria, stockInicial, ubicacion, idMarca } = req.body;
     const userId = (req as RequestWithUser).user?.userId || 1;
 
     await pool.request()
@@ -60,6 +60,7 @@ export const create = async (req: Request, res: Response) => {
       .input('Stock_Inicial', sql.Int, stockInicial || 0)
       .input('Id_Ubicacion', sql.VarChar, ubicacion || 'A101')
       .input('Id_Usuario', sql.Int, userId)
+      .input('Id_Marca', sql.Int, idMarca || null)
       .execute('sp_RegistrarProductoWMS');
 
     return res.status(201).json({ success: true, message: 'Producto creado exitosamente' });
@@ -161,5 +162,23 @@ export const getLocations = async (_req: Request, res: Response) => {
   } catch (error) {
     console.error('Error al obtener ubicaciones:', error);
     return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+};
+
+export const createCategory = async (req: Request, res: Response) => {
+  try {
+    const { nombre } = req.body;
+    if (!nombre) {
+      return res.status(400).json({ success: false, message: 'Nombre es requerido' });
+    }
+    const result = await pool.request()
+      .input('Nombre_Categoria', sql.VarChar, nombre)
+      .execute('sp_CrearCategoriaWMS');
+    const newId = result.recordset[0]?.Id_Categoria;
+    return res.status(201).json({ success: true, message: 'Categoría creada exitosamente', data: { id: newId, nombre } });
+  } catch (error: any) {
+    console.error('Error al crear categoría:', error);
+    const msg = error.message || 'Error interno del servidor';
+    return res.status(500).json({ success: false, message: msg });
   }
 };

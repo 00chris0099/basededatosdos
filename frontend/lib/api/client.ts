@@ -31,3 +31,43 @@ export async function apiClient<T = any>(endpoint: string, options: RequestOptio
 
   return data;
 }
+
+export interface Category {
+  Id_Categoria: number;
+  Nombre_Categoria: string;
+}
+
+export interface Brand {
+  Id_Marca: number;
+  Nombre_Marca: string;
+  Id_Categoria: number;
+  Nombre_Categoria: string;
+}
+
+export async function getCategories(token: string): Promise<Category[]> {
+  const res = await apiClient<{ success: boolean; data: Category[] }>("/api/products/categories", { token });
+  return res.data;
+}
+
+export async function createCategory(nombre: string, token: string): Promise<Category> {
+  const res = await apiClient<{ success: boolean; data: Category }>("/api/products/categories", {
+    method: "POST",
+    body: { nombre },
+    token,
+  });
+  return res.data;
+}
+
+export async function getBrandsByCategory(categoryId: number, token: string): Promise<Brand[]> {
+  const res = await apiClient<{ success: boolean; data: Brand[] }>(`/api/brands/${categoryId}`, { token });
+  return res.data;
+}
+
+export async function createBrand(nombre: string, categoriaId: number, token: string): Promise<Brand> {
+  const res = await apiClient<{ success: boolean; data: Brand }>("/api/brands", {
+    method: "POST",
+    body: { nombre, categoriaId },
+    token,
+  });
+  return res.data;
+}

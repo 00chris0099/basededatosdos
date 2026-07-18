@@ -32,6 +32,7 @@ DROP TABLE IF EXISTS Auditoria_Sistema;
 DROP TABLE IF EXISTS Producto;
 DROP TABLE IF EXISTS Cliente;
 DROP TABLE IF EXISTS Ubicacion;
+DROP TABLE IF EXISTS Marca;
 DROP TABLE IF EXISTS Categoria;
 DROP TABLE IF EXISTS Usuario;
 DROP TABLE IF EXISTS Rol;
@@ -97,6 +98,15 @@ CREATE TABLE Categoria(
 );
 GO
 
+CREATE TABLE Marca(
+    Id_Marca INT IDENTITY(1,1) PRIMARY KEY,
+    Nombre_Marca VARCHAR(80) NOT NULL,
+    Id_Categoria INT NOT NULL,
+    CONSTRAINT UQ_Marca_Nombre_Categoria UNIQUE (Nombre_Marca, Id_Categoria),
+    CONSTRAINT FK_Marca_Categoria FOREIGN KEY(Id_Categoria) REFERENCES Categoria(Id_Categoria)
+);
+GO
+
 CREATE TABLE Producto(
     Id_Producto INT IDENTITY(1,1) PRIMARY KEY,
     Codigo_Producto VARCHAR(50) NOT NULL UNIQUE,
@@ -105,9 +115,11 @@ CREATE TABLE Producto(
     Precio DECIMAL(10,2) NOT NULL,
     Stock_Minimo INT NOT NULL,
     Id_Categoria INT NOT NULL,
+    Id_Marca INT NULL,
     CONSTRAINT CK_Producto_Precio CHECK(Precio > 0),
     CONSTRAINT CK_Producto_StockMinimo CHECK(Stock_Minimo >= 0),
-    CONSTRAINT FK_Producto_Categoria FOREIGN KEY(Id_Categoria) REFERENCES Categoria(Id_Categoria)
+    CONSTRAINT FK_Producto_Categoria FOREIGN KEY(Id_Categoria) REFERENCES Categoria(Id_Categoria),
+    CONSTRAINT FK_Producto_Marca FOREIGN KEY(Id_Marca) REFERENCES Marca(Id_Marca)
 );
 GO
 
@@ -263,6 +275,14 @@ INSERT INTO Tipo_Movimiento (Descripcion) VALUES ('Entrada'),('Salida'),('Ajuste
 GO
 
 INSERT INTO Categoria (Nombre_Categoria) VALUES ('Electronica'),('Oficina'),('Herramientas'),('Accesorios'),('Limpieza');
+GO
+
+INSERT INTO Marca (Nombre_Marca, Id_Categoria) VALUES
+('Samsung',1),('LG',1),('Sony',1),('Apple',1),('Xiaomi',1),('Lenovo',1),('Dell',1),('HP',1),
+('Epson',2),('Brother',2),('Canon',2),('Xerox',2),('3M',2),('Pilot',2),
+('Bosch',3),('DeWalt',3),('Makita',3),('Black+Decker',3),('Stanley',3),('Milwaukee',3),('Ingco',3),
+('Logitech',4),('Baseus',4),('Anker',4),('Kingston',4),('SanDisk',4),('Corsair',4),
+('Oxi',5),('Fabuloso',5),('Clorox',5),('Ajax',5),('Pinol',5);
 GO
 
 INSERT INTO Ubicacion (Codigo_Ubicacion,Pasillo,Estante,Nivel)
@@ -531,6 +551,11 @@ DROP PROCEDURE IF EXISTS sp_EliminarProductoWMS;
 DROP PROCEDURE IF EXISTS sp_EliminarCategoriaWMS;
 DROP PROCEDURE IF EXISTS sp_AutenticarUsuarioWMS;
 DROP PROCEDURE IF EXISTS sp_AsignarRolUsuarioWMS;
+DROP PROCEDURE IF EXISTS sp_CrearMarcaWMS;
+DROP PROCEDURE IF EXISTS sp_ListarMarcasWMS;
+DROP PROCEDURE IF EXISTS sp_ListarMarcasPorCategoriaWMS;
+DROP PROCEDURE IF EXISTS sp_EliminarMarcaWMS;
+DROP PROCEDURE IF EXISTS sp_CrearCategoriaWMS;
 GO
 
 -- RF-01: Registro de productos
@@ -543,7 +568,8 @@ CREATE OR ALTER PROCEDURE sp_RegistrarProductoWMS
     @Id_Categoria INT,
     @Stock_Inicial INT,
     @Id_Ubicacion VARCHAR(20),
-    @Id_Usuario INT
+    @Id_Usuario INT,
+    @Id_Marca INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -554,6 +580,9 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM Categoria WHERE Id_Categoria = @Id_Categoria)
             THROW 51001, 'La categoria especificada no existe.', 1;
 
+        IF @Id_Marca IS NOT NULL AND NOT EXISTS (SELECT 1 FROM Marca WHERE Id_Marca = @Id_Marca)
+            THROW 51035, 'La marca especificada no existe.', 1;
+
         IF NOT EXISTS (SELECT 1 FROM Ubicacion WHERE Codigo_Ubicacion = @Id_Ubicacion)
             THROW 51002, 'La ubicacion especificada no existe.', 1;
 
@@ -562,8 +591,8 @@ BEGIN
 
         BEGIN TRANSACTION;
 
-        INSERT INTO Producto (Codigo_Producto, Nombre_Producto, Descripcion, Precio, Stock_Minimo, Id_Categoria)
-        VALUES (@Codigo_Producto, @Nombre_Producto, @Descripcion, @Precio, @Stock_Minimo, @Id_Categoria);
+        INSERT INTO Producto (Codigo_Producto, Nombre_Producto, Descripcion, Precio, Stock_Minimo, Id_Categoria, Id_Marca)
+        VALUES (@Codigo_Producto, @Nombre_Producto, @Descripcion, @Precio, @Stock_Minimo, @Id_Categoria, @Id_Marca);
 
         DECLARE @New_Id_Producto INT = SCOPE_IDENTITY();
 
@@ -1080,6 +1109,115 @@ BEGIN
         BEGIN TRANSACTION;
         UPDATE Usuario SET Id_Rol = @Id_Rol WHERE Id_Usuario = @Id_Usuario;
         COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+-- =====================================================
+-- MARCAS: SPs
+-- =====================================================
+
+CREATE OR ALTER PROCEDURE sp_CrearMarcaWMS
+    @Nombre_Marca VARCHAR(80),
+    @Id_Categoria INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM Categoria WHERE Id_Categoria = @Id_Categoria)
+            THROW 51030, 'La categoria especificada no existe.', 1;
+
+        IF EXISTS (SELECT 1 FROM Marca WHERE Nombre_Marca = @Nombre_Marca AND Id_Categoria = @Id_Categoria)
+            THROW 51031, 'La marca ya existe en esta categoria.', 1;
+
+        BEGIN TRANSACTION;
+        INSERT INTO Marca (Nombre_Marca, Id_Categoria)
+        VALUES (@Nombre_Marca, @Id_Categoria);
+        COMMIT TRANSACTION;
+
+        SELECT SCOPE_IDENTITY() AS Id_Marca;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+CREATE OR ALTER PROCEDURE sp_ListarMarcasWMS
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        m.Id_Marca,
+        m.Nombre_Marca,
+        m.Id_Categoria,
+        c.Nombre_Categoria
+    FROM Marca m
+    INNER JOIN Categoria c ON m.Id_Categoria = c.Id_Categoria
+    ORDER BY c.Nombre_Categoria, m.Nombre_Marca;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE sp_ListarMarcasPorCategoriaWMS
+    @Id_Categoria INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        m.Id_Marca,
+        m.Nombre_Marca,
+        m.Id_Categoria,
+        c.Nombre_Categoria
+    FROM Marca m
+    INNER JOIN Categoria c ON m.Id_Categoria = c.Id_Categoria
+    WHERE m.Id_Categoria = @Id_Categoria
+    ORDER BY m.Nombre_Marca;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE sp_EliminarMarcaWMS
+    @Id_Marca INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM Marca WHERE Id_Marca = @Id_Marca)
+            THROW 51032, 'La marca no existe.', 1;
+
+        IF EXISTS (SELECT 1 FROM Producto WHERE Id_Marca = @Id_Marca)
+            THROW 51033, 'No se puede eliminar la marca porque tiene productos asociados.', 1;
+
+        BEGIN TRANSACTION;
+        DELETE FROM Marca WHERE Id_Marca = @Id_Marca;
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+CREATE OR ALTER PROCEDURE sp_CrearCategoriaWMS
+    @Nombre_Categoria VARCHAR(80)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF EXISTS (SELECT 1 FROM Categoria WHERE Nombre_Categoria = @Nombre_Categoria)
+            THROW 51034, 'La categoria ya esta registrada.', 1;
+
+        BEGIN TRANSACTION;
+        INSERT INTO Categoria (Nombre_Categoria)
+        VALUES (@Nombre_Categoria);
+        COMMIT TRANSACTION;
+
+        SELECT SCOPE_IDENTITY() AS Id_Categoria;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
