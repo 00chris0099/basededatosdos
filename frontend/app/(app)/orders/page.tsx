@@ -1,48 +1,132 @@
 "use client";
-import { useState } from "react";
-import { mockData } from "@/lib/mock/data";
-import { money, statusBadgeColor, orderFlow } from "@/lib/utils/format";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth/auth-context";
+import { apiClient, getOrders, getOrderById, advanceOrder, updateOrderStatus, createOrder, getClients, getAllProducts, Order, OrderDetail, Client } from "@/lib/api/client";
+import { money, statusBadgeColor, orderFlow } from "@/lib/utils/format";
 
 const kpiConfigs = [
   { key: "Pendiente",  color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", icon: "hourglass_empty" },
-  { key: "Picking",   color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", icon: "qr_code_scanner"  },
-  { key: "Packing",   color: "#d97706", bg: "#fffbeb", border: "#fde68a", icon: "inventory"         },
-  { key: "En Ruta",   color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0", icon: "local_shipping"   },
+  { key: "En Proceso",   color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", icon: "qr_code_scanner"  },
+  { key: "Completado",   color: "#d97706", bg: "#fffbeb", border: "#fde68a", icon: "inventory"         },
+  { key: "Cancelado",   color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0", icon: "local_shipping"   },
 ];
 
 export default function OrdersPage() {
-  const { canManage } = useAuth();
-  const [orders, setOrders] = useState(mockData.orders);
-  const [modalOrder, setModalOrder] = useState<string | null>(null);
+  const { token, canManage, canSupervise } = useAuth();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modalOrder, setModalOrder] = useState<OrderDetail | null>(null);
+  const [error, setError] = useState("");
 
-  const updateStatus = async (id: string, status: string) => {
-    await fetch(`/api/orders/${id}/status`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
-    setOrders([...mockData.orders]);
+  // Create order modal
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [selectedClient, setSelectedClient] = useState("");
+  const [orderItems, setOrderItems] = useState<{ Id_Producto: number; Cantidad: number; Precio_Unitario: number; Nombre: string }[]>([]);
+  const [creating, setCreating] = useState(false);
+
+  const fetchOrders = async () => {
+    if (!token) return;
+    try {
+      const data = await getOrders(token);
+      setOrders(data);
+    } catch {}
+    finally { setLoading(false); }
   };
 
-  const advanceOrder = async (id: string) => {
-    await fetch(`/api/orders/${id}/advance`, { method: "POST" });
-    setOrders([...mockData.orders]);
+  useEffect(() => { fetchOrders(); }, [token]);
+
+  const handleAdvance = async (id: number) => {
+    if (!token) return;
+    setError("");
+    try {
+      await advanceOrder(id, token);
+      await fetchOrders();
+      if (modalOrder?.Id_Pedido === id) {
+        const updated = await getOrderById(id, token);
+        setModalOrder(updated);
+      }
+    } catch (e: any) {
+      setError(e.message || "Error al avanzar pedido");
+    }
   };
 
-  const deleteOrder = async (id: string) => {
-    if (!confirm(`¿Borrar pedido ${id}?`)) return;
-    await fetch(`/api/orders/${id}`, { method: "DELETE" });
-    setOrders([...mockData.orders]);
+  const handleStatusChange = async (id: number, status: string) => {
+    if (!token) return;
+    setError("");
+    try {
+      await updateOrderStatus(id, status, token);
+      await fetchOrders();
+    } catch (e: any) {
+      setError(e.message || "Error al cambiar estado");
+    }
   };
 
-  const createOrder = async () => {
-    await fetch("/api/orders", { method: "POST" });
-    setOrders([...mockData.orders]);
+  const openModal = async (id: number) => {
+    if (!token) return;
+    try {
+      const detail = await getOrderById(id, token);
+      setModalOrder(detail);
+    } catch {}
   };
 
-  const modal = modalOrder ? mockData.orders.find(o => o.id === modalOrder) : null;
+  const openCreateModal = async () => {
+    if (!token) return;
+    try {
+      const [c, p] = await Promise.all([getClients(token), getAllProducts(token)]);
+      setClients(c);
+      setProducts(p);
+      setSelectedClient("");
+      setOrderItems([]);
+      setShowCreateModal(true);
+    } catch {}
+  };
+
+  const addProductToOrder = (prod: any) => {
+    const existing = orderItems.find(i => i.Id_Producto === prod.Id_Producto);
+    if (existing) {
+      setOrderItems(orderItems.map(i =>
+        i.Id_Producto === prod.Id_Producto ? { ...i, Cantidad: i.Cantidad + 1 } : i
+      ));
+    } else {
+      setOrderItems([...orderItems, {
+        Id_Producto: prod.Id_Producto,
+        Cantidad: 1,
+        Precio_Unitario: prod.Precio,
+        Nombre: prod.Nombre_Producto,
+      }]);
+    }
+  };
+
+  const removeItemFromOrder = (idProducto: number) => {
+    setOrderItems(orderItems.filter(i => i.Id_Producto !== idProducto));
+  };
+
+  const handleCreateOrder = async () => {
+    if (!token || !selectedClient || orderItems.length === 0) return;
+    setCreating(true);
+    setError("");
+    try {
+      await createOrder(Number(selectedClient), orderItems.map(i => ({
+        Id_Producto: i.Id_Producto,
+        Cantidad: i.Cantidad,
+        Precio_Unitario: i.Precio_Unitario,
+      })), token);
+      setShowCreateModal(false);
+      await fetchOrders();
+    } catch (e: any) {
+      setError(e.message || "Error al crear pedido");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Cargando pedidos...</div>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-
-      {/* ── PAGE HEADER ── */}
+      {/* PAGE HEADER */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", fontFamily: "var(--font-display, system-ui)", margin: 0, lineHeight: 1.2 }}>
@@ -52,16 +136,28 @@ export default function OrdersPage() {
             Control de flujo operativo: desde la recepción hasta la última milla.
           </p>
         </div>
-        <button onClick={createOrder} className="premium-button" style={{ flexShrink: 0 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 17 }}>add_box</span>
-          Nuevo Pedido Demo
-        </button>
+        {canSupervise() && (
+          <button onClick={openCreateModal} className="premium-button" style={{ flexShrink: 0 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 17 }}>add_box</span>
+            Nuevo Pedido
+          </button>
+        )}
       </div>
 
-      {/* ── KPI CARDS ── */}
+      {error && (
+        <div style={{
+          padding: "12px 16px", borderRadius: 10, background: "#fef2f2",
+          border: "1px solid #fecaca", color: "#dc2626", fontSize: 13, fontWeight: 600,
+        }}>
+          {error}
+          <button onClick={() => setError("")} style={{ marginLeft: 10, background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontWeight: 700 }}>✕</button>
+        </div>
+      )}
+
+      {/* KPI CARDS */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
         {kpiConfigs.map(({ key, color, bg, border, icon }) => {
-          const count = orders.filter(o => o.status === key).length;
+          const count = orders.filter(o => o.Estado_Pedido === key).length;
           return (
             <div key={key} className="premium-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -82,7 +178,7 @@ export default function OrdersPage() {
         })}
       </div>
 
-      {/* ── ORDERS TABLE ── */}
+      {/* ORDERS TABLE */}
       <div className="premium-card" style={{ padding: 24 }}>
         <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "0 0 16px 0", fontFamily: "var(--font-display, system-ui)" }}>
           Pedidos del Almacén
@@ -91,30 +187,24 @@ export default function OrdersPage() {
           <table className="data-table">
             <thead>
               <tr>
-                {["Pedido", "Cliente", "Prioridad", "Fecha", "Monto", "Estado", "Asignado", "Acciones"].map(h => (
+                {["Pedido", "Cliente", "Fecha", "Monto", "Estado", "Items", "Acciones"].map(h => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {orders.map(o => (
-                <tr key={o.id}>
-                  <td style={{ fontWeight: 700, color: "#0f172a" }}>#{o.id}</td>
-                  <td style={{ fontWeight: 500 }}>{o.customer}</td>
-                  <td>
-                    <span className={statusBadgeColor(o.priority)} style={{
-                      display: "inline-flex", padding: "2px 10px",
-                      borderRadius: 999, fontSize: 11, fontWeight: 600,
-                    }}>
-                      {o.priority}
-                    </span>
+                <tr key={o.Id_Pedido}>
+                  <td style={{ fontWeight: 700, color: "#0f172a" }}>#{o.Id_Pedido}</td>
+                  <td style={{ fontWeight: 500 }}>{o.Cliente}</td>
+                  <td style={{ color: "#94a3b8", fontWeight: 500, whiteSpace: "nowrap" }}>
+                    {new Date(o.Fecha_Pedido).toLocaleDateString("es-PE")}
                   </td>
-                  <td style={{ color: "#94a3b8", fontWeight: 500, whiteSpace: "nowrap" }}>{o.date}</td>
-                  <td style={{ fontWeight: 700 }}>{money(o.amount)}</td>
+                  <td style={{ fontWeight: 700 }}>{money(o.Precio_Total)}</td>
                   <td>
                     <select
-                      value={o.status}
-                      onChange={e => updateStatus(o.id, e.target.value)}
+                      value={o.Estado_Pedido}
+                      onChange={e => handleStatusChange(o.Id_Pedido, e.target.value)}
                       style={{
                         border: "1px solid #e2e8f0", borderRadius: 8,
                         padding: "5px 32px 5px 10px", background: "#fff",
@@ -126,126 +216,78 @@ export default function OrdersPage() {
                       {orderFlow().map(st => <option key={st}>{st}</option>)}
                     </select>
                   </td>
-                  <td style={{ color: "#64748b", fontWeight: 500 }}>{o.assigned}</td>
+                  <td style={{ color: "#64748b", fontWeight: 500 }}>{o.Total_Lineas || 0} líneas</td>
                   <td>
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                       <button
-                        onClick={() => setModalOrder(o.id)}
+                        onClick={() => openModal(o.Id_Pedido)}
                         style={{
                           padding: "5px 12px", borderRadius: 7,
                           border: "1px solid #e2e8f0", background: "#fff",
                           fontSize: 12, fontWeight: 600, color: "#334155",
-                          cursor: "pointer", transition: "all 0.15s ease",
-                          whiteSpace: "nowrap",
+                          cursor: "pointer", whiteSpace: "nowrap",
                         }}
                       >Ver</button>
                       <button
-                        onClick={() => advanceOrder(o.id)}
+                        onClick={() => handleAdvance(o.Id_Pedido)}
                         style={{
                           padding: "5px 12px", borderRadius: 7,
                           border: "none", background: "#2563eb",
                           fontSize: 12, fontWeight: 600, color: "#fff",
-                          cursor: "pointer", transition: "all 0.15s ease",
-                          whiteSpace: "nowrap",
+                          cursor: "pointer", whiteSpace: "nowrap",
                         }}
                       >Avanzar</button>
-                      {canManage() && (
-                        <button
-                          onClick={() => deleteOrder(o.id)}
-                          style={{
-                            padding: "5px 12px", borderRadius: 7,
-                            border: "none", background: "#fee2e2",
-                            fontSize: 12, fontWeight: 600, color: "#dc2626",
-                            cursor: "pointer", transition: "all 0.15s ease",
-                            whiteSpace: "nowrap",
-                          }}
-                        >Borrar</button>
-                      )}
                     </div>
                   </td>
                 </tr>
               ))}
+              {orders.length === 0 && (
+                <tr><td colSpan={7} style={{ textAlign: "center", padding: 24, color: "#94a3b8" }}>No hay pedidos registrados</td></tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* ── INFO BANNER ── */}
-      <div style={{
-        display: "flex", alignItems: "flex-start", gap: 12,
-        background: "#eff6ff", border: "1px solid #bfdbfe",
-        borderRadius: 12, padding: "16px 20px",
-      }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#2563eb", flexShrink: 0, marginTop: 1 }}>info</span>
-        <div style={{ fontSize: 13, color: "#334155" }}>
-          <strong style={{ color: "#1e3a5f", fontWeight: 700, display: "block", marginBottom: 3 }}>Flujo del Paquete:</strong>
-          Pendiente → Picking (Recolección) → Packing (Empaque) → Listo para Despacho → En Ruta → Entregado.
-        </div>
-      </div>
-
-      {/* ── MODAL ── */}
-      {modal && (
+      {/* DETAIL MODAL */}
+      {modalOrder && (
         <div
           onClick={() => setModalOrder(null)}
           style={{
-            position: "fixed", inset: 0,
-            background: "rgba(15, 23, 42, 0.5)",
-            backdropFilter: "blur(4px)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 100, padding: 16,
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(15, 23, 42, 0.5)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
           }}
         >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              width: "100%", maxWidth: 460,
-              background: "#fff", borderRadius: 18,
-              padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-              border: "1px solid #e2e8f0",
-              display: "flex", flexDirection: "column", gap: 20,
-            }}
-          >
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "100%", maxWidth: 500, background: "#fff", borderRadius: 18,
+            padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", border: "1px solid #e2e8f0",
+            display: "flex", flexDirection: "column", gap: 20,
+          }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <h3 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", fontFamily: "var(--font-display, system-ui)", margin: 0 }}>
-                  Detalle de Pedido {modal.id}
+                  Pedido #{modalOrder.Id_Pedido}
                 </h3>
-                <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>{modal.customer}</span>
+                <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>{modalOrder.Cliente}</span>
               </div>
-              <span className={statusBadgeColor(modal.status)} style={{
-                display: "inline-flex", padding: "3px 12px",
-                borderRadius: 999, fontSize: 11, fontWeight: 700,
+              <span className={statusBadgeColor(modalOrder.Estado_Pedido)} style={{
+                display: "inline-flex", padding: "3px 12px", borderRadius: 999, fontSize: 11, fontWeight: 700,
               }}>
-                {modal.status}
+                {modalOrder.Estado_Pedido}
               </span>
-            </div>
-
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 8 }}>
-                Cambiar Estado
-              </label>
-              <select
-                value={modal.status}
-                onChange={e => { updateStatus(modal.id, e.target.value); setModalOrder(null); }}
-                style={{
-                  width: "100%", border: "1px solid #e2e8f0", borderRadius: 10,
-                  padding: "10px 36px 10px 14px", background: "#f8fafc",
-                  fontSize: 13.5, fontWeight: 500, color: "#0f172a",
-                  outline: "none", cursor: "pointer", fontFamily: "inherit",
-                }}
-              >
-                {orderFlow().map(st => <option key={st}>{st}</option>)}
-              </select>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, background: "#f8fafc", borderRadius: 10, padding: 14, border: "1px solid #e2e8f0" }}>
               <div>
-                <span style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Asignado a:</span>
-                <span style={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a" }}>{modal.assigned}</span>
+                <span style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Fecha:</span>
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a" }}>
+                  {new Date(modalOrder.Fecha_Pedido).toLocaleDateString("es-PE")}
+                </span>
               </div>
               <div>
-                <span style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Ruta de Envío:</span>
-                <span style={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a" }}>{modal.route}</span>
+                <span style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Total:</span>
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: "#2563eb" }}>{money(modalOrder.Precio_Total)}</span>
               </div>
             </div>
 
@@ -253,42 +295,146 @@ export default function OrdersPage() {
               <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 10 }}>
                 Artículos del Pedido
               </span>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto" }}>
-                {modal.items.map((item, i) => {
-                  const prod = mockData.products.find(p => p.sku === item.sku);
-                  return (
-                    <div key={i} style={{
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 180, overflowY: "auto" }}>
+                {modalOrder.items?.map((item, i) => (
+                  <div key={i} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    background: "#f8fafc", border: "1px solid #e2e8f0",
+                    borderRadius: 8, padding: "8px 12px",
+                  }}>
+                    <div style={{ minWidth: 0, flex: 1, paddingRight: 12 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {item.Nombre_Producto}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}>{item.Codigo_Producto} · {money(item.Precio_Unitario)} c/u</div>
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#334155", flexShrink: 0 }}>
+                      x{item.Cantidad}
+                    </span>
+                  </div>
+                ))}
+                {(!modalOrder.items || modalOrder.items.length === 0) && (
+                  <div style={{ textAlign: "center", padding: 12, color: "#94a3b8", fontSize: 13 }}>Sin items</div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 16, display: "flex", gap: 10 }}>
+              <button
+                onClick={() => setModalOrder(null)}
+                style={{
+                  flex: 1, padding: "11px", borderRadius: 10,
+                  border: "1px solid #e2e8f0", background: "#fff",
+                  fontSize: 13, fontWeight: 600, color: "#334155",
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                Cerrar
+              </button>
+              {canSupervise() && (
+                <button
+                  onClick={() => { handleAdvance(modalOrder.Id_Pedido); setModalOrder(null); }}
+                  className="premium-button"
+                  style={{ flex: 1 }}
+                >
+                  Avanzar Pedido
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE ORDER MODAL */}
+      {showCreateModal && (
+        <div
+          onClick={() => setShowCreateModal(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(15,23,42,0.5)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+          }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "100%", maxWidth: 550, background: "#fff", borderRadius: 18,
+            padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+            display: "flex", flexDirection: "column", gap: 18, maxHeight: "85vh", overflowY: "auto",
+          }}>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0f172a" }}>Nuevo Pedido</h3>
+
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 6 }}>Cliente *</label>
+              <select value={selectedClient} onChange={e => setSelectedClient(e.target.value)} style={{
+                width: "100%", border: "1px solid #e2e8f0", borderRadius: 10,
+                padding: "10px 14px", fontSize: 13.5, color: "#0f172a", outline: "none",
+              }}>
+                <option value="">Seleccionar cliente...</option>
+                {clients.map(c => <option key={c.Id_Cliente} value={c.Id_Cliente}>{c.Nombre} ({c.Num_Documento})</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 6 }}>Agregar productos</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 100, overflowY: "auto", padding: "8px 0" }}>
+                {products.map(p => (
+                  <button key={p.Id_Producto} onClick={() => addProductToOrder(p)} style={{
+                    padding: "5px 10px", borderRadius: 6, border: "1px solid #e2e8f0",
+                    background: "#fff", fontSize: 11, fontWeight: 600, color: "#334155",
+                    cursor: "pointer", fontFamily: "inherit",
+                  }}>
+                    {p.Nombre_Producto} · {money(p.Precio)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {orderItems.length > 0 && (
+              <div>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 6 }}>
+                  Items ({orderItems.length})
+                </label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {orderItems.map(item => (
+                    <div key={item.Id_Producto} style={{
                       display: "flex", justifyContent: "space-between", alignItems: "center",
                       background: "#f8fafc", border: "1px solid #e2e8f0",
                       borderRadius: 8, padding: "8px 12px",
                     }}>
-                      <div style={{ minWidth: 0, flex: 1, paddingRight: 12 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {prod?.name || item.sku}
-                        </div>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{item.sku}</div>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{item.Nombre}</span>
+                        <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: 8 }}>{money(item.Precio_Unitario)}</span>
                       </div>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#334155", flexShrink: 0 }}>
-                        {item.scanned} / {item.qty} esc.
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <input
+                          type="number" min="1" value={item.Cantidad}
+                          onChange={e => setOrderItems(orderItems.map(i =>
+                            i.Id_Producto === item.Id_Producto ? { ...i, Cantidad: Number(e.target.value) || 1 } : i
+                          ))}
+                          style={{ width: 50, border: "1px solid #e2e8f0", borderRadius: 6, padding: "4px 8px", fontSize: 12, textAlign: "center", outline: "none" }}
+                        />
+                        <button onClick={() => removeItemFromOrder(item.Id_Producto)} style={{
+                          background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 16, fontWeight: 700,
+                        }}>×</button>
+                      </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 16 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, borderTop: "1px solid #e2e8f0", paddingTop: 16 }}>
+              <button onClick={() => setShowCreateModal(false)} style={{
+                padding: "9px 18px", borderRadius: 9, border: "1px solid #e2e8f0",
+                background: "#fff", fontSize: 13, fontWeight: 600, color: "#334155",
+                cursor: "pointer", fontFamily: "inherit",
+              }}>Cancelar</button>
               <button
-                onClick={() => setModalOrder(null)}
-                style={{
-                  width: "100%", padding: "11px", borderRadius: 10,
-                  border: "1px solid #e2e8f0", background: "#fff",
-                  fontSize: 13, fontWeight: 600, color: "#334155",
-                  cursor: "pointer", transition: "all 0.15s ease",
-                  fontFamily: "inherit",
-                }}
+                onClick={handleCreateOrder}
+                disabled={!selectedClient || orderItems.length === 0 || creating}
+                className="premium-button"
+                style={{ opacity: (!selectedClient || orderItems.length === 0 || creating) ? 0.5 : 1 }}
               >
-                Cerrar Ventana
+                {creating ? "Creando..." : "Crear Pedido"}
               </button>
             </div>
           </div>

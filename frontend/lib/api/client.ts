@@ -71,3 +71,81 @@ export async function createBrand(nombre: string, categoriaId: number, token: st
   });
   return res.data;
 }
+
+export interface Order {
+  Id_Pedido: number;
+  Fecha_Pedido: string;
+  Precio_Total: number;
+  Cliente: string;
+  Estado_Pedido: string;
+  Total_Lineas: number;
+  Total_Unidades: number;
+}
+
+export interface OrderDetail extends Order {
+  Id_Cliente: number;
+  Num_Documento: string;
+  Telefono_Cliente: string;
+  items: OrderItem[];
+}
+
+export interface OrderItem {
+  Id_Detalle_Pedido: number;
+  Cantidad: number;
+  Subtotal: number;
+  Precio_Unitario: number;
+  Id_Producto: number;
+  Nombre_Producto: string;
+  Codigo_Producto: string;
+}
+
+export interface Client {
+  Id_Cliente: number;
+  Nombre: string;
+  Num_Documento: string;
+}
+
+export async function getOrders(token: string): Promise<Order[]> {
+  const res = await apiClient<{ success: boolean; data: Order[] }>("/api/orders", { token });
+  return res.data;
+}
+
+export async function getOrderById(id: number, token: string): Promise<OrderDetail> {
+  const res = await apiClient<{ success: boolean; data: OrderDetail }>(`/api/orders/${id}`, { token });
+  return res.data;
+}
+
+export async function createOrder(clienteId: number, items: { Id_Producto: number; Cantidad: number; Precio_Unitario: number }[], token: string): Promise<{ id: number }> {
+  const res = await apiClient<{ success: boolean; data: { id: number } }>("/api/orders", {
+    method: "POST",
+    body: { clienteId, items },
+    token,
+  });
+  return res.data;
+}
+
+export async function advanceOrder(id: number, token: string): Promise<{ Nuevo_Estado: string }> {
+  const res = await apiClient<{ success: boolean; data: { Nuevo_Estado: string } }>(`/api/orders/${id}/advance`, {
+    method: "POST",
+    token,
+  });
+  return res.data;
+}
+
+export async function updateOrderStatus(id: number, status: string, token: string): Promise<void> {
+  await apiClient(`/api/orders/${id}/status`, {
+    method: "PUT",
+    body: { status },
+    token,
+  });
+}
+
+export async function getClients(token: string): Promise<Client[]> {
+  const res = await apiClient<{ success: boolean; data: Client[] }>("/api/products/clients", { token });
+  return res.data;
+}
+
+export async function getAllProducts(token: string): Promise<any[]> {
+  const res = await apiClient<{ success: boolean; data: any[] }>("/api/products", { token });
+  return res.data;
+}

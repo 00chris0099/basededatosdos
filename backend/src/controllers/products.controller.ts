@@ -182,3 +182,13 @@ export const createCategory = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, message: msg });
   }
 };
+
+export const getClients = async (_req: Request, res: Response) => {
+  try {
+    const result = await pool.request().query('SELECT Id_Cliente, Nombre, Num_Documento, Telefono, Correo, Direccion FROM Cliente');
+    return res.status(200).json({ success: true, data: result.recordset });
+  } catch (error) {
+    console.error('Error al obtener clientes:', error);
+    return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+};

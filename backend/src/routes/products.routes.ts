@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAll, getBySku, create, update, deleteProduct, addMovement, getCategories, getLocations, createCategory } from '../controllers/products.controller';
+import { getAll, getBySku, create, update, deleteProduct, addMovement, getCategories, getLocations, createCategory, getClients } from '../controllers/products.controller';
 import { verifyToken } from '../middleware/auth';
 import { canManage, canSupervise } from '../middleware/roles';
 
@@ -9,6 +9,7 @@ router.get('/', verifyToken, getAll);
 router.get('/categories', verifyToken, getCategories);
 router.post('/categories', verifyToken, canSupervise, createCategory);
 router.get('/locations', verifyToken, getLocations);
+router.get('/clients', verifyToken, getClients);
 router.get('/sku/:sku', verifyToken, getBySku);
 router.get('/:id', verifyToken, getBySku);
 router.post('/', verifyToken, canSupervise, create);
