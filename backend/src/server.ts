@@ -10,7 +10,7 @@ import inventoryRoutes from './routes/inventory.routes';
 dotenv.config();
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '4000');
+const PORT = parseInt(process.env.PORT || '80');
 
 console.log('Iniciando servidor WMS...');
 console.log('DB_SERVER:', process.env.DB_SERVER);
