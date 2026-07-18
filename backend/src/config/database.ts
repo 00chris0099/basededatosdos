@@ -17,12 +17,23 @@ const dbConfig: sql.config = {
     min: 0,
     max: 10,
   },
+  connectionTimeout: 15000,
+  requestTimeout: 15000,
 };
 
 export const pool = new sql.ConnectionPool(dbConfig);
 
-pool.connect()
-  .then(() => console.log('Conectado a SQL Server'))
-  .catch((err) => console.error('Error de conexión a SQL Server:', err));
+let connected = false;
 
+pool.connect()
+  .then(() => {
+    connected = true;
+    console.log('Conectado a SQL Server - DB:', dbConfig.database, '- Server:', dbConfig.server);
+  })
+  .catch((err) => {
+    console.error('Error de conexion a SQL Server:', err.message);
+    console.error('DB_SERVER:', dbConfig.server, 'DB_PORT:', dbConfig.port);
+  });
+
+export function isConnected() { return connected; }
 export default pool;
